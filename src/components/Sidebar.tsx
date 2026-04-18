@@ -82,10 +82,10 @@ export default function Sidebar() {
             <NavLink to="/categories" className={({ isActive }) => cn("flex items-center gap-3 py-2.5 text-[14px] font-medium transition-colors decoration-transparent", isActive ? "text-primary-color" : "text-text-main hover:text-primary-color")}>
               <LayoutGrid className="w-4 h-4" /> All Categories
             </NavLink>
-            {['Action Arcade', 'Battle Royale', 'Strategy HQ', 'Retro Classics', 'Sports & Racing'].map((cat) => (
+            {['Action', 'Racing', 'Puzzle', 'Arcade', 'Sports', 'Casual', 'Adventure', 'Strategy'].map((cat) => (
               <NavLink
                 key={cat}
-                to={`/category/${cat.toLowerCase().replace(/\s+/g, '-')}`}
+                to={`/category/${cat.toLowerCase()}`}
                 className="flex items-center gap-3 py-2.5 text-[14px] font-medium text-text-main hover:text-primary-color transition-colors decoration-transparent"
               >
                 {cat}
@@ -100,6 +100,10 @@ export default function Sidebar() {
             <NavLink to="/developer/upload" className={({ isActive }) => cn("flex items-center gap-3 py-2.5 text-[14px] font-medium transition-colors decoration-transparent", isActive ? "text-primary-color" : "text-text-main hover:text-primary-color")}>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
               Submit Game
+            </NavLink>
+            <NavLink to="/developer/upload" className={({ isActive }) => cn("flex items-center gap-3 py-2.5 text-[14px] font-medium transition-colors decoration-transparent", isActive ? "text-yellow-500" : "text-yellow-500/80 hover:text-yellow-500")}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              Earn 10% Revenue
             </NavLink>
           </div>
         </div>

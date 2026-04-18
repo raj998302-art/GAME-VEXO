@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Maximize2, Heart, Share2, AlertCircle, Star, Play, MessageSquare, Send } from 'lucide-react';
-import { collection, query, where, getDocs, limit, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Maximize2, Heart, Share2, AlertCircle, Star, Play, MessageSquare, Send, Gamepad2, Download } from 'lucide-react';
+import { collection, query, where, getDocs, limit, orderBy, addDoc, serverTimestamp, getDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import SEO from '../components/SEO';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
 import GameCard from '../components/GameCard';
+import AdBanner from '../components/AdBanner';
 
 type GameState = 'initial' | 'interstitial' | 'playing';
 
@@ -35,42 +36,85 @@ export default function GamePlay() {
       if (!slug) return;
       setIsLoading(true);
       try {
-        const gamesRef = collection(db, 'games');
-        const q = query(gamesRef, where('slug', '==', slug), limit(1));
-        const snapshot = await getDocs(q);
+        const docRef = doc(db, 'games', slug);
+        const docSnap = await getDoc(docRef);
         
-        if (!snapshot.empty) {
-          const gameData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+        let gameData = null;
+
+        // Note: Because we auto-seed using the slug as the document ID, getDoc by slug works perfectly.
+        // It also bypasses Firestore's "requires status == approved" collection-level query blocks.
+        if (docSnap.exists()) {
+           gameData = { id: docSnap.id, ...docSnap.data() };
+           
+           // REAL-TIME VIEW INCREMENT: Every time the page loads, we add 1 to the 'views' exactly
+           try {
+             await updateDoc(docRef, { views: increment(1) });
+             gameData.views = (gameData.views || 0) + 1;
+             
+             if (user) {
+               const userRef = doc(db, 'users', user.uid);
+               await updateDoc(userRef, {
+                 score: increment(10),
+                 gamesPlayed: increment(1)
+               });
+             }
+           } catch (incrementErr) {
+             console.error("Could not increment view - Check Firestore rules if blocking:", incrementErr);
+           }
+        } else {
+           // Fallback in case a game was added with an auto-generated ID but has a slug field
+           const gamesRef = collection(db, 'games');
+           const fallbackQ = query(gamesRef, where('slug', '==', slug), limit(1));
+           try {
+             const fallbackSnap = await getDocs(fallbackQ);
+             if (!fallbackSnap.empty) {
+               gameData = { id: fallbackSnap.docs[0].id, ...fallbackSnap.docs[0].data() };
+             }
+           } catch (fallbackErr) {
+             console.error("Fallback query failed (likely permission rules blocking query without status):", fallbackErr);
+           }
+        }
+        
+        if (gameData) {
           setGame(gameData);
           addRecentlyPlayed(gameData.id);
           
-          // Fetch similar games
+          // Fetch similar games (client-side filter to prevent index errors)
           if (gameData.category) {
-            const similarQ = query(
-              gamesRef, 
-              where('category', '==', gameData.category),
-              where('status', '==', 'approved'),
-              limit(4)
-            );
-            const similarSnapshot = await getDocs(similarQ);
-            const similarData = similarSnapshot.docs
-              .map(doc => ({ id: doc.id, ...doc.data() }))
-              .filter(g => g.slug !== slug)
-              .slice(0, 3);
-            setSimilarGames(similarData);
+            try {
+              const gamesRef = collection(db, 'games');
+              // Just query all approved and filter category in JS, prevents needing a composite index
+              const similarQ = query(
+                gamesRef, 
+                where('status', '==', 'approved'),
+                limit(20)
+              );
+              const similarSnapshot = await getDocs(similarQ);
+              const similarData = similarSnapshot.docs
+                .map((d) => ({ id: d.id, ...d.data() } as any))
+                .filter((g) => g.category === gameData.category && g.slug !== slug)
+                .slice(0, 3);
+              setSimilarGames(similarData);
+            } catch (err) {
+              console.error("Similar games fetch error:", err);
+            }
           }
 
           // Fetch comments
-          const commentsRef = collection(db, 'comments');
-          const commentsQ = query(
-            commentsRef,
-            where('gameId', '==', gameData.id),
-            orderBy('createdAt', 'desc'),
-            limit(20)
-          );
-          const commentsSnapshot = await getDocs(commentsQ);
-          const commentsData = commentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setComments(commentsData);
+          try {
+            const commentsRef = collection(db, 'comments');
+            const commentsQ = query(
+              commentsRef,
+              where('gameId', '==', gameData.id),
+              orderBy('createdAt', 'desc'),
+              limit(20)
+            );
+            const commentsSnapshot = await getDocs(commentsQ);
+            const commentsData = commentsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            setComments(commentsData);
+          } catch (err) {
+            console.error("Comments fetch error:", err);
+          }
 
         } else {
           setGame(null);
@@ -207,8 +251,8 @@ export default function GamePlay() {
           {gameState === 'interstitial' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg-dark z-20 p-8 text-center">
               <div className="text-text-dim text-sm uppercase tracking-widest mb-4">Advertisement</div>
-              <div className="w-full max-w-md aspect-video bg-card-bg border border-dashed border-border-color rounded-xl flex items-center justify-center mb-8">
-                <span className="text-text-dim">Your Ad Here</span>
+              <div className="w-full max-w-md aspect-video rounded-xl flex items-center justify-center mb-8 bg-card-bg relative">
+                 <AdBanner slot="video-preroll-slot-id" className="w-full h-full" />
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-text-main font-medium">Game starts in {adCountdown}s</span>
@@ -232,25 +276,47 @@ export default function GamePlay() {
                 </div>
               )}
               
-              <iframe
-                ref={iframeRef}
-                src={game.url}
-                className="w-full h-full border-0"
-                onLoad={() => setIsLoading(false)}
-                allow="autoplay; fullscreen; focus-without-user-activation *;"
-                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-              />
+              {((game.uploadType === 'file' && (game.gameUrl?.includes('.apk') || game.gameUrl?.includes('.aab'))) || game.gameUrl?.includes('.apk') || game.gameUrl?.includes('.aab')) ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg-dark z-20">
+                  <Gamepad2 className="w-16 h-16 text-text-dim mb-4" />
+                  <p className="mb-6 text-text-main font-bold text-center px-4">
+                    This is a mobile app file (.APK / .AAB) and cannot be previewed in the browser.
+                  </p>
+                  <a 
+                    href={game.gameUrl || game.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="px-8 py-4 bg-primary-color text-white rounded-full font-bold hover:bg-primary-color/90 transition-all hover:scale-105 shadow-[0_0_20px_var(--primary-glow)] flex items-center gap-2"
+                  >
+                    <Download className="w-6 h-6" />
+                    Download File to Device
+                  </a>
+                </div>
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  src={game.gameUrl || game.url}
+                  className="w-full h-full border-0"
+                  onLoad={() => setIsLoading(false)}
+                  allow="autoplay; fullscreen; focus-without-user-activation; gamepad; camera; microphone"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              )}
 
               {!isFullscreen && (
                 <button 
                   onClick={toggleFullscreen}
-                  className="absolute bottom-4 right-4 p-3 rounded-xl bg-black/50 hover:bg-primary-color text-white backdrop-blur-sm transition-all z-20"
+                  className="absolute bottom-4 right-4 p-3 rounded-xl bg-black/50 hover:bg-primary-color text-white backdrop-blur-sm transition-all z-30"
                 >
                   <Maximize2 className="w-5 h-5" />
                 </button>
               )}
             </>
           )}
+        </div>
+
+        <div className="w-full flex justify-center py-2">
+           <AdBanner slot="video-under-game-slot-id" format="horizontal" className="w-full max-w-[728px] h-[90px]" />
         </div>
 
         {/* Game Info & Actions */}
@@ -322,9 +388,27 @@ export default function GamePlay() {
                       key={star}
                       onMouseEnter={() => setHoverRating(star)}
                       onMouseLeave={() => setHoverRating(0)}
-                      onClick={() => {
+                      onClick={async () => {
+                        if (!user) return alert("Please login to rate this game.");
                         setRating(star);
-                        alert(`Thanks for rating ${star} stars!`);
+                        try {
+                          const docRef = doc(db, 'games', game.id);
+                          const currentRatingCount = game.ratingCount || 0;
+                          const currentRating = game.rating || 0;
+                          const newRatingCount = currentRatingCount + 1;
+                          const newRating = ((currentRating * currentRatingCount) + star) / newRatingCount;
+                          const roundedRating = Math.round(newRating * 10) / 10;
+                          
+                          await updateDoc(docRef, {
+                            rating: roundedRating,
+                            ratingCount: newRatingCount
+                          });
+                          alert(`Thanks for rating ${star} stars!`);
+                          setGame({...game, rating: roundedRating, ratingCount: newRatingCount});
+                        } catch(e) {
+                          console.error(e);
+                          alert("Failed to save rating");
+                        }
                       }}
                       className="p-1 transition-transform hover:scale-110"
                     >

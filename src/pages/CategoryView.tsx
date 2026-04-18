@@ -15,6 +15,7 @@ export default function CategoryView() {
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [indexError, setIndexError] = useState<string | null>(null);
   const GAMES_PER_PAGE = 8;
 
   useEffect(() => {
@@ -22,20 +23,33 @@ export default function CategoryView() {
       setIsLoading(true);
       try {
         const gamesRef = collection(db, 'games');
+        // By removing orderBy('createdAt'), we prevent the need for a composite index!
+        // Two '==' where clauses natively work without extra indexes in Firestore.
         const q = query(
           gamesRef, 
           where('status', '==', 'approved'),
-          where('category', '==', categoryName),
-          orderBy('createdAt', 'desc'),
-          limit(GAMES_PER_PAGE)
+          where('category', '==', categoryName)
         );
         const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        setGames(data);
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === GAMES_PER_PAGE);
-      } catch (error) {
+        // Manual sort by createdAt if it exists to maintain order without the db block
+        const sortedData = data.sort((a: any, b: any) => {
+          if (!a.createdAt || !b.createdAt) return 0;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        const paginatedData = sortedData.slice(0, GAMES_PER_PAGE);
+        setGames(paginatedData);
+        setLastDoc(GAMES_PER_PAGE); // Track index for memory pagination since we fetch all matches
+        setHasMore(sortedData.length > GAMES_PER_PAGE);
+      } catch (error: any) {
+        if (error.message && error.message.includes('requires an index')) {
+          const linkMatch = error.message.match(/https:\/\/[^\s]+/);
+          if (linkMatch) {
+            setIndexError(`Index Required for Categories! Click here to create it: ${linkMatch[0]}`);
+          }
+        }
         console.error("Error fetching category games:", error);
       } finally {
         setIsLoading(false);
@@ -48,25 +62,36 @@ export default function CategoryView() {
   }, [categoryName]);
 
   const loadMore = async () => {
-    if (!lastDoc) return;
+    if (lastDoc === null) return;
     setIsLoadingMore(true);
     try {
       const gamesRef = collection(db, 'games');
       const q = query(
         gamesRef, 
         where('status', '==', 'approved'),
-        where('category', '==', categoryName),
-        orderBy('createdAt', 'desc'),
-        startAfter(lastDoc),
-        limit(GAMES_PER_PAGE)
+        where('category', '==', categoryName)
       );
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      setGames(prev => [...prev, ...data]);
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-      setHasMore(snapshot.docs.length === GAMES_PER_PAGE);
-    } catch (error) {
+      const sortedData = data.sort((a: any, b: any) => {
+        if (!a.createdAt || !b.createdAt) return 0;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+      const nextIndex = lastDoc + GAMES_PER_PAGE;
+      const paginatedData = sortedData.slice(lastDoc, nextIndex);
+      
+      setGames(prev => [...prev, ...paginatedData]);
+      setLastDoc(nextIndex);
+      setHasMore(sortedData.length > nextIndex);
+    } catch (error: any) {
+      if (error.message && error.message.includes('requires an index')) {
+        const linkMatch = error.message.match(/https:\/\/[^\s]+/);
+        if (linkMatch) {
+          setIndexError(`Index Required for Categories! Click here to create it: ${linkMatch[0]}`);
+        }
+      }
       console.error("Error loading more games:", error);
     } finally {
       setIsLoadingMore(false);
@@ -90,6 +115,15 @@ export default function CategoryView() {
             <p className="text-text-dim">Showing all games in {categoryName}</p>
           </div>
         </div>
+
+        {indexError && (
+          <div className="bg-red-500/20 border border-red-500 rounded-xl p-4 text-center mb-6">
+            <h3 className="text-red-500 font-bold mb-2">Firestore Index Required for Category</h3>
+            <a href={indexError.split(': ')[1]} target="_blank" rel="noopener noreferrer" className="text-white underline break-all">
+              {indexError}
+            </a>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="text-center py-10 text-text-dim">Loading games...</div>

@@ -8,6 +8,7 @@ import GameCard from '../components/GameCard';
 export default function Trending() {
   const [games, setGames] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [indexError, setIndexError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTrendingGames = async () => {
@@ -22,8 +23,12 @@ export default function Trending() {
         const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setGames(data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching trending games:", error);
+        if (error.message && error.message.includes('requires an index')) {
+          const match = error.message.match(/https:\/\/[^\s]+/);
+          if (match) setIndexError(`Index Required for Trending! Click here: ${match[0]}`);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -49,6 +54,15 @@ export default function Trending() {
             <p className="text-text-dim">The hottest games everyone is playing</p>
           </div>
         </div>
+
+        {indexError && (
+          <div className="bg-red-500/20 border border-red-500 rounded-xl p-4 text-center mb-6">
+            <h3 className="text-red-500 font-bold mb-2">Firestore Index Required</h3>
+            <a href={indexError.split('here: ')[1]} target="_blank" rel="noopener noreferrer" className="text-white underline break-all">
+              {indexError}
+            </a>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="text-center py-10 text-text-dim">Loading trending games...</div>

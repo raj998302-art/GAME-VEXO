@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send } from 'lucide-react';
+import { MessageCircle, X, Send, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, orderBy, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -10,6 +10,14 @@ export default function SupportWidget() {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Calculate daily messages limit
+  const todayMessagesCount = messages.filter(
+    (m) => m.sender === 'user' && new Date(m.timestamp).toDateString() === new Date().toDateString()
+  ).length;
+
+  const messagesRemaining = Math.max(0, 10 - todayMessagesCount);
+  const canSendMessage = messagesRemaining > 0;
 
   useEffect(() => {
     if (!user || !isOpen) return;
@@ -43,7 +51,7 @@ export default function SupportWidget() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !user) return;
+    if (!message.trim() || !user || !canSendMessage) return;
 
     const newMessage = {
       sender: 'user',
@@ -80,12 +88,17 @@ export default function SupportWidget() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-[350px] h-[500px] bg-card-bg border border-border-color rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
+        <div className="fixed bottom-24 right-6 w-[350px] h-[550px] bg-card-bg border border-border-color rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
           <div className="p-4 bg-bg-dark border-b border-border-color flex items-center justify-between">
-            <h3 className="font-bold text-text-main flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-primary-color" />
-              Support Chat
-            </h3>
+            <div>
+              <h3 className="font-bold text-text-main flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-primary-color" />
+                Support Chat
+              </h3>
+              <p className="text-[10px] text-text-dim mt-1">
+                {messagesRemaining} messages remaining today
+              </p>
+            </div>
             <button onClick={() => setIsOpen(false)} className="text-text-dim hover:text-white">
               <X className="w-5 h-5" />
             </button>
@@ -111,22 +124,31 @@ export default function SupportWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          <form onSubmit={handleSend} className="p-4 border-t border-border-color bg-bg-dark flex gap-2">
-            <input 
-              type="text" 
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 bg-card-bg border border-border-color rounded-xl px-4 py-2 text-sm text-text-main focus:outline-none focus:border-primary-color"
-            />
-            <button 
-              type="submit"
-              disabled={!message.trim()}
-              className="p-2 bg-primary-color text-white rounded-xl hover:bg-primary-color/90 disabled:opacity-50 transition-colors"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
+          <div className="p-4 border-t border-border-color bg-bg-dark">
+            {!canSendMessage && (
+              <div className="mb-3 flex items-center gap-2 text-yellow-500 text-[11px] bg-yellow-500/10 p-2 rounded-lg">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <p>You have reached your daily limit of 10 messages. Your limit will reset at midnight.</p>
+              </div>
+            )}
+            <form onSubmit={handleSend} className="flex gap-2">
+              <input 
+                type="text" 
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={canSendMessage ? "Type your message..." : "Limit reached..."}
+                disabled={!canSendMessage}
+                className="flex-1 bg-card-bg border border-border-color rounded-xl px-4 py-2 text-sm text-text-main focus:outline-none focus:border-primary-color disabled:opacity-50"
+              />
+              <button 
+                type="submit"
+                disabled={!message.trim() || !canSendMessage}
+                className="p-2 bg-primary-color text-white rounded-xl hover:bg-primary-color/90 disabled:opacity-50 transition-colors"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </>

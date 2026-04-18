@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Share2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';

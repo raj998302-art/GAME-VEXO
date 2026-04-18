@@ -9,9 +9,9 @@ interface SEOProps {
 }
 
 export default function SEO({ title, description, keywords, image, url }: SEOProps) {
-  const siteTitle = 'GameVexo - Online Gaming Platform';
-  const fullTitle = title === 'Home' ? siteTitle : `${title} | ${siteTitle}`;
-  const defaultImage = 'https://picsum.photos/seed/nexusplay/1200/630';
+  const siteTitle = 'GAME VEXO';
+  const fullTitle = title === 'Home' ? siteTitle : `${title} - ${siteTitle}`;
+  const defaultImage = 'https://i.ibb.co/N21dNzw7/logo.jpg';
 
   return (
     <Helmet>
@@ -25,12 +25,24 @@ export default function SEO({ title, description, keywords, image, url }: SEOPro
       <meta property="og:image" content={image || defaultImage} />
       {url && <meta property="og:url" content={url} />}
       <meta property="og:type" content="website" />
+      <meta property="og:site_name" content="GAME VEXO" />
       
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={image || defaultImage} />
+
+      {/* JSON-LD Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "name": "GAME VEXO",
+          "alternateName": ["GameVexo", "Game Vexo"],
+          "url": "https://gamevexo.com/"
+        })}
+      </script>
     </Helmet>
   );
 }

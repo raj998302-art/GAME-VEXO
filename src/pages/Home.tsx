@@ -6,6 +6,7 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { db } from '../firebase/config';
 import SEO from '../components/SEO';
 import GameCard from '../components/GameCard';
+import AdBanner from '../components/AdBanner';
 
 const DEFAULT_HERO_SLIDES = [
   {
@@ -40,31 +41,52 @@ export default function Home() {
   const [trendingGames, setTrendingGames] = useState<any[]>([]);
   const [heroSlides, setHeroSlides] = useState<any[]>(DEFAULT_HERO_SLIDES);
   const [isLoading, setIsLoading] = useState(true);
+  const [indexError, setIndexError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchGames = async () => {
       try {
         const gamesRef = collection(db, 'games');
         
-        // Fetch Recent Games
-        const recentQuery = query(
-          gamesRef, 
-          where('status', '==', 'approved'),
-          orderBy('createdAt', 'desc'),
-          limit(6)
-        );
-        const recentSnapshot = await getDocs(recentQuery);
-        const recentData = recentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let recentData: any[] = [];
+        try {
+          const recentQuery = query(
+            gamesRef, 
+            where('status', '==', 'approved'),
+            orderBy('createdAt', 'desc'),
+            limit(6)
+          );
+          const recentSnapshot = await getDocs(recentQuery);
+          recentData = recentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (err: any) {
+          if (err.message && err.message.includes('requires an index')) {
+            const linkMatch = err.message.match(/https:\/\/[^\s]+/);
+            if (linkMatch) {
+              setIndexError(`Index Required for 'Recent'! Click here to create it: ${linkMatch[0]}`);
+            }
+          }
+          console.error("Recent index error:", err);
+        }
         
-        // Fetch Trending Games (ordered by views)
-        const trendingQuery = query(
-          gamesRef,
-          where('status', '==', 'approved'),
-          orderBy('views', 'desc'),
-          limit(6)
-        );
-        const trendingSnapshot = await getDocs(trendingQuery);
-        const trendingData = trendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let trendingData: any[] = [];
+        try {
+          const trendingQuery = query(
+            gamesRef,
+            where('status', '==', 'approved'),
+            orderBy('views', 'desc'),
+            limit(6)
+          );
+          const trendingSnapshot = await getDocs(trendingQuery);
+          trendingData = trendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (err: any) {
+          if (err.message && err.message.includes('requires an index')) {
+            const linkMatch = err.message.match(/https:\/\/[^\s]+/);
+            if (linkMatch) {
+              setIndexError(`Index Required for 'Trending'! Click here to create it: ${linkMatch[0]}`);
+            }
+          }
+           console.error("Trending index error:", err);
+        }
 
         setRecentGames(recentData);
         setTrendingGames(trendingData);
@@ -114,6 +136,15 @@ export default function Home() {
       />
       
       <div className="space-y-10">
+        {indexError && (
+          <div className="bg-red-500/20 border border-red-500 rounded-xl p-4 text-center">
+            <h3 className="text-red-500 font-bold mb-2">Firestore Index Required</h3>
+            <a href={indexError.split(': ')[1]} target="_blank" rel="noopener noreferrer" className="text-white underline break-all">
+              {indexError}
+            </a>
+          </div>
+        )}
+
         {/* Hero Section */}
         {heroSlides.length > 0 && (
           <section className="relative h-[300px] w-full rounded-[24px] overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.5)] group">
@@ -219,6 +250,11 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {/* Home In-feed Ad Banner */}
+        <div className="w-full flex justify-center py-4">
+           <AdBanner slot="home-infeed-ad-slot" format="horizontal" className="w-full max-w-[970px] h-[90px] xl:h-[250px]" />
+        </div>
 
         {/* Trending Games */}
         <section>

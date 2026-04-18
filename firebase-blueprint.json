@@ -56,6 +56,22 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "messages"]
+    },
+    "PayoutRequest": {
+      "title": "PayoutRequest",
+      "description": "Developer payout request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "upiDetails": { "type": "string" },
+        "amountRequested": { "type": "string" },
+        "proofScreenshotUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "upiDetails", "amountRequested", "status"]
     }
   },
   "firestore": {
@@ -70,6 +86,10 @@
     "/supportChats/{chatId}": {
       "schema": { "$ref": "#/entities/SupportChat" },
       "description": "Support chats"
+    },
+    "/payouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/PayoutRequest" },
+      "description": "Payout requests from developers"
     }
   }
 }

@@ -1,14 +1,18 @@
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Upload, Gamepad2, Settings, LogOut, LayoutGrid, Home, DollarSign, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Upload, Gamepad2, Settings, LogOut, LayoutGrid, Home, DollarSign, MessageCircle, CreditCard, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { cn } from '../../utils/helpers';
 import { signOut } from 'firebase/auth';
-import { auth } from '../../firebase/config';
+import { auth, db } from '../../firebase/config';
+import { useState, useEffect } from 'react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const adminNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: Upload, label: 'Upload Game', path: '/admin/upload' },
-  { icon: Gamepad2, label: 'Manage Games', path: '/admin/games' },
+  { icon: Gamepad2, label: 'Manage Games', path: '/admin/games', badge: 'pendingGames' },
+  { icon: Users, label: 'Manage Users', path: '/admin/users' },
+  { icon: CreditCard, label: 'Payouts', path: '/admin/payouts' },
   { icon: LayoutGrid, label: 'Categories', path: '/admin/categories' },
   { icon: Home, label: 'Homepage Control', path: '/admin/homepage' },
   { icon: MessageCircle, label: 'Support Chats', path: '/admin/support' },
@@ -20,6 +24,18 @@ export default function AdminLayout() {
   const { user, isAdmin } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const [pendingGamesCount, setPendingGamesCount] = useState(0);
+
+  useEffect(() => {
+    // Listen for pending games securely via client
+    const q = query(collection(db, 'games'), where('status', '==', 'pending'));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setPendingGamesCount(snap.docs.length);
+    }, (err) => {
+      console.warn("Could not fetch pending games count:", err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // For demo purposes, we'll bypass actual auth check if user wants to see admin
   // In production, uncomment this:
@@ -51,17 +67,25 @@ export default function AdminLayout() {
           <h4 className="text-[11px] uppercase tracking-[0.1em] text-text-dim mb-4 font-semibold">Menu</h4>
           {adminNavItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const badgeCount = item.badge === 'pendingGames' ? pendingGamesCount : 0;
             return (
               <Link
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex items-center gap-3 py-2.5 text-[14px] font-medium transition-colors decoration-transparent",
+                  "flex items-center justify-between py-2.5 text-[14px] font-medium transition-colors decoration-transparent group",
                   isActive ? "text-primary-color" : "text-text-main hover:text-primary-color"
                 )}
               >
-                <item.icon className="w-4 h-4" />
-                {item.label}
+                <div className="flex items-center gap-3">
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </div>
+                {badgeCount > 0 && (
+                  <span className="bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold group-hover:scale-110 transition-transform">
+                    {badgeCount}
+                  </span>
+                )}
               </Link>
             );
           })}

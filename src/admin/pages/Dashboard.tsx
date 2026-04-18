@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [recentGames, setRecentGames] = useState<any[]>([]);
   const [topGames, setTopGames] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [indexError, setIndexError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -47,9 +48,21 @@ export default function Dashboard() {
         setRecentGames(recentSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         // Fetch Top Games
-        const topQ = query(collection(db, 'games'), where('status', '==', 'approved'), orderBy('views', 'desc'), limit(5));
-        const topSnap = await getDocs(topQ);
-        setTopGames(topSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        let topGamesData: any[] = [];
+        try {
+          const topQ = query(collection(db, 'games'), where('status', '==', 'approved'), orderBy('views', 'desc'), limit(5));
+          const topSnap = await getDocs(topQ);
+          topGamesData = topSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (err: any) {
+          if (err.message && err.message.includes('requires an index')) {
+            console.error("Dashboard Top Games index error:", err);
+            const linkMatch = err.message.match(/https:\/\/[^\s]+/);
+            if (linkMatch) {
+              setIndexError(`Index Required for 'Top Games'! Click here to create it: ${linkMatch[0]}`);
+            }
+          }
+        }
+        setTopGames(topGamesData);
 
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -70,10 +83,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold mb-2 text-text-main">Dashboard</h1>
-        <p className="text-text-dim">Welcome back, Admin. Here's what's happening today.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 text-text-main">Dashboard</h1>
+          <p className="text-text-dim">Welcome back, Admin. Here's what's happening today.</p>
+        </div>
       </div>
+
+      {indexError && (
+        <div className="bg-red-500/20 border border-red-500 rounded-xl p-4 text-center">
+          <h3 className="text-red-500 font-bold mb-2">Firestore Index Required for Dashboard</h3>
+          <a href={indexError.split(': ')[1]} target="_blank" rel="noopener noreferrer" className="text-white underline break-all">
+            {indexError}
+          </a>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-10 text-text-dim">Loading dashboard data...</div>

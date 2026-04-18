@@ -27,7 +27,7 @@ export default function Recent() {
           where('slug', 'in', recentlyPlayed.slice(0, 10))
         );
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const data: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         // Sort data to match the order of recentlyPlayed
         const sortedData = data.sort((a, b) => {

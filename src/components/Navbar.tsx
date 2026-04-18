@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Menu, Moon, Sun, Gamepad2, UserCircle } from 'lucide-react';
+import { Search, Menu, Moon, Sun, Gamepad2, UserCircle, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -8,12 +8,14 @@ export default function Navbar() {
   const { isDarkMode, toggleDarkMode, toggleMobileMenu } = useAppStore();
   const { user, isAdmin } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowMobileSearch(false);
     }
   };
 
@@ -29,13 +31,14 @@ export default function Navbar() {
           </button>
           
           <Link to="/" className="flex items-center gap-2.5 group">
-            <span className="font-display font-extrabold text-[28px] tracking-[-0.05em] text-white flex items-center gap-2.5 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all group-hover:drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
+            <img src="https://i.ibb.co/N21dNzw7/logo.jpg" alt="GAME VEXO Logo" className="w-10 h-10 rounded-xl shadow-[0_0_15px_var(--primary-glow)]" />
+            <span className="font-display font-extrabold text-[28px] tracking-[-0.05em] text-white hidden sm:flex items-center gap-2.5 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all group-hover:drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
               GAME<span className="text-primary-color neon-text drop-shadow-[0_0_20px_var(--primary-glow)] animate-pulse">VEXO</span>
             </span>
           </Link>
         </div>
 
-        <div className="flex-1 max-w-[400px] px-4 hidden md:block">
+        <div className={`flex-1 px-4 md:block ${showMobileSearch ? 'absolute top-[70px] left-0 w-full bg-bg-dark border-b border-border-color p-4 block md:static md:bg-transparent md:border-none md:p-0 md:max-w-[400px]' : 'hidden'}`}>
           <form onSubmit={handleSearch} className="relative">
             <input 
               type="text" 
@@ -51,6 +54,12 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-5">
+          <button 
+            onClick={() => setShowMobileSearch(!showMobileSearch)}
+            className="md:hidden p-2 rounded-full hover:bg-primary-glow transition-colors text-text-main relative z-50"
+          >
+            {showMobileSearch ? <X className="w-5 h-5 text-red-500" /> : <Search className="w-5 h-5" />}
+          </button>
           <button 
             onClick={toggleDarkMode}
             className="p-2 rounded-full hover:bg-primary-glow transition-colors text-text-main"

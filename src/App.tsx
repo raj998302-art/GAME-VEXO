@@ -29,12 +29,14 @@ import Settings from './admin/pages/Settings';
 import AdsManagement from './admin/pages/AdsManagement';
 import HomepageControl from './admin/pages/HomepageControl';
 import SupportChats from './admin/pages/SupportChats';
+import PayoutRequests from './admin/pages/PayoutRequests';
+import AdminUsers from './admin/pages/AdminUsers';
 
 export default function App() {
   const { setUser, setIsAdmin, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Anti-inspect and anti-copy measures
+    // Anti-inspect and anti-copy measures (Enabled for production)
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
     const handleKeyDown = (e: KeyboardEvent) => {
       // Prevent F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U
@@ -174,7 +176,9 @@ export default function App() {
             <Route path="categories" element={<ManageCategories />} />
             <Route path="homepage" element={<HomepageControl />} />
             <Route path="support" element={<SupportChats />} />
+            <Route path="users" element={<AdminUsers />} />
             <Route path="ads" element={<AdsManagement />} />
+            <Route path="payouts" element={<PayoutRequests />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<div className="p-8 text-center"><h1 className="text-4xl font-bold mb-4">404</h1><p>Admin Page not found</p></div>} />
           </Route>
